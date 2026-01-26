@@ -54,11 +54,25 @@ const getReadableError = (error: unknown) => {
   return "Unexpected error. Please try again.";
 };
 
-const baseChainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? "0");
-const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID ?? "0");
+// Debug: Log env vars at module load
+if (typeof window !== 'undefined') {
+  console.log('[ENV Check] NEXT_PUBLIC_BAD_BUNNZ_BASE:', process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE);
+  console.log('[ENV Check] NEXT_PUBLIC_BAD_BUNNZ_MEGA:', process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA);
+  console.log('[ENV Check] NEXT_PUBLIC_ETH_BRIDGE:', process.env.NEXT_PUBLIC_ETH_BRIDGE);
+  console.log('[ENV Check] NEXT_PUBLIC_MEGA_BRIDGE:', process.env.NEXT_PUBLIC_MEGA_BRIDGE);
+}
+
+const baseChainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? "0x14a34");
+const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID ?? "0x18c7");
 
 const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL ?? "https://base-sepolia.drpc.org";
 const megaRpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? "https://carrot.megaeth.com/rpc";
+
+// Add fallback addresses from your Railway config
+const baseNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE as Address) ?? ("0xcCc5D02de05A490D949A19be3685F371CB0F8543" as Address);
+const megaNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA as Address) ?? ("0xefE87bdC8A9eEBA823d530c6328E2A2E318fb41b" as Address);
+const baseBridgeAddress = (process.env.NEXT_PUBLIC_ETH_BRIDGE as Address) ?? ("0x713E2060eF942C3681225abf5e176fc1E5AFE31F" as Address);
+const megaBridgeAddress = (process.env.NEXT_PUBLIC_MEGA_BRIDGE as Address) ?? ("0x849F736Dfe0385E7c0EC429Cf89e23c316b48f51" as Address);
 
 const baseChain = defineChain({
   id: baseChainId,
@@ -97,18 +111,18 @@ const getMegaClient = () => {
 const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
   base: {
     chainId: baseChainId,
-    rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL ?? "",
-    nftAddress: (process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE as Address) ?? null,
-    bridgeAddress: (process.env.NEXT_PUBLIC_ETH_BRIDGE as Address) ?? null,
+    rpcUrl: baseRpcUrl,
+    nftAddress: baseNftAddress,
+    bridgeAddress: baseBridgeAddress,
     label: "Base Sepolia",
     subLabel: "Base testnet",
     icon: "Ξ",
   },
   mega: {
     chainId: megaChainId,
-    rpcUrl: process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? "",
-    nftAddress: (process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA as Address) ?? null,
-    bridgeAddress: (process.env.NEXT_PUBLIC_MEGA_BRIDGE as Address) ?? null,
+    rpcUrl: megaRpcUrl,
+    nftAddress: megaNftAddress,
+    bridgeAddress: megaBridgeAddress,
     label: "MegaETH",
     subLabel: "Permissioned",
     icon: "MΞ",
