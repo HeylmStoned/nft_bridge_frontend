@@ -24,7 +24,7 @@ const megaEthTestnet = defineChain({
 
 const walletConnectId =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??
-  "2f93b0d4e8dfea2ea6be0edb2f0d0104";
+  "8f13f7d27e77938d29a672397521582b";
 
 const config = getDefaultConfig({
   appName: "Bad Bunnz Bridge",
