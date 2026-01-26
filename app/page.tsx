@@ -39,7 +39,7 @@ type ChainConfig = {
 const statusHighlights = [
   { label: "Verification", value: "Automated", icon: Shield },
   { label: "Throughput", value: "500 bunnz/min", icon: Sparkles },
-  { label: "Bridge Time", value: "~120 sec", icon: Timer },
+  { label: "Bridge Time", value: "Instant", icon: Timer },
 ];
 
 const shortenHash = (hash: string) => `${hash.slice(0, 6)}…${hash.slice(-4)}`;
@@ -54,13 +54,6 @@ const getReadableError = (error: unknown) => {
   return "Unexpected error. Please try again.";
 };
 
-// Debug: Log env vars at module load
-if (typeof window !== 'undefined') {
-  console.log('[ENV Check] NEXT_PUBLIC_BAD_BUNNZ_BASE:', process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE);
-  console.log('[ENV Check] NEXT_PUBLIC_BAD_BUNNZ_MEGA:', process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA);
-  console.log('[ENV Check] NEXT_PUBLIC_ETH_BRIDGE:', process.env.NEXT_PUBLIC_ETH_BRIDGE);
-  console.log('[ENV Check] NEXT_PUBLIC_MEGA_BRIDGE:', process.env.NEXT_PUBLIC_MEGA_BRIDGE);
-}
 
 const baseChainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? "0x14a34");
 const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID ?? "0x18c7");
@@ -151,14 +144,6 @@ export default function Home() {
   );
 
   const queryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress);
-  console.log("[NFT Query] Enabled check:", {
-    queryEnabled,
-    hasAddress: Boolean(address),
-    hasNftAddress: Boolean(CHAIN_CONFIG[fromChain].nftAddress),
-    address,
-    fromChain,
-    nftAddress: CHAIN_CONFIG[fromChain].nftAddress,
-  });
 
   const {
     data: ownedNfts = [],
@@ -169,41 +154,24 @@ export default function Home() {
     queryKey: ["nfts", address, fromChain],
     enabled: queryEnabled,
     queryFn: async () => {
-      console.log("[NFT Query] Starting fetch", { address, fromChain });
-      if (!address) {
-        console.log("[NFT Query] No address, returning empty");
-        return [];
-      }
+      if (!address) return [];
       try {
         const client = fromChain === "base" ? getBaseClient() : getMegaClient();
         const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
-        console.log("[NFT Query] Client created, nftAddress:", nftAddress);
-        if (!nftAddress) {
-          console.log("[NFT Query] No nftAddress, returning empty");
-          return [];
-        }
+        if (!nftAddress) return [];
 
-        console.log("[NFT Query] Calling fetchOwnedNfts...");
-        const result = await fetchOwnedNfts({
+        return await fetchOwnedNfts({
           client,
           nftAddress,
           owner: address as Address,
         });
-        console.log("[NFT Query] Success, found", result.length, "NFTs");
-        return result;
       } catch (error) {
-        console.error("[NFT Query] Error:", error);
         throw error;
       }
     },
     retry: 2,
   });
 
-  useEffect(() => {
-    if (nftError) {
-      console.error("[NFT Query] Query error:", nftError);
-    }
-  }, [nftError]);
 
   useEffect(() => {
     setSelectedNFTs((current) =>
@@ -640,7 +608,7 @@ export default function Home() {
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
                         ETA
                       </p>
-                      <p className="text-lg font-semibold">~2 minutes</p>
+                      <p className="text-lg font-semibold">Instant</p>
                     </div>
                   </div>
 
