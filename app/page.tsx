@@ -514,9 +514,8 @@ export default function Home() {
                 Bridge your Bad Bunnz instantly
               </h1>
               <p className="hero-subtitle text-base">
-                Connect, pick your route, and manage inventory without
-                scrolling. Stats and actions stay within the same viewport for
-                faster testing.
+                Transfer your NFTs between Base Sepolia and MegaETH testnets
+                securely with automated verification.
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {statusHighlights.map(({ label, value, icon: Icon }) => (
