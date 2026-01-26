@@ -33,9 +33,17 @@ const envContent = envVars
 const envPath = path.join(process.cwd(), '.env.production');
 fs.writeFileSync(envPath, envContent + '\n', 'utf8');
 
-console.log('Created .env.production with Railway environment variables');
+console.log('=== Railway Env Var Check ===');
+envVars.forEach((varName) => {
+  const value = process.env[varName];
+  console.log(`${varName}: ${value ? 'SET (' + value.substring(0, 20) + '...)' : 'NOT SET'}`);
+});
+
+console.log('\nCreated .env.production with Railway environment variables');
 if (envContent) {
   console.log('Variables set:', envVars.filter((v) => process.env[v]).join(', '));
+  console.log('\n.env.production content:');
+  console.log(envContent);
 } else {
   console.log('Warning: No NEXT_PUBLIC_* variables found in environment');
 }

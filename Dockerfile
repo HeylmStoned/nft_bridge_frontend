@@ -17,7 +17,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # According to Railway docs: https://docs.railway.com/guides/dockerfiles
 # Variables are available as regular ENV vars during build
 # Create .env.production file so Next.js can read them
-RUN node scripts/create-env.js || echo "Warning: Could not create .env.production"
+RUN echo "=== Checking Railway Environment Variables ===" && \
+    node scripts/create-env.js && \
+    echo "=== .env.production created ===" && \
+    cat .env.production || echo "Warning: Could not create .env.production"
 
 # Build the application
 RUN npm run build
