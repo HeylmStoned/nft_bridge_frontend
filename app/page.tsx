@@ -39,7 +39,7 @@ type ChainConfig = {
 const statusHighlights = [
   { label: "Verification", value: "Automated", icon: Shield },
   { label: "Throughput", value: "500 bunnz/min", icon: Sparkles },
-  { label: "Bridge Time", value: "Instant", icon: Timer },
+  { label: "Bridge Time", value: "~10 sec", icon: Timer },
 ];
 
 const shortenHash = (hash: string) => `${hash.slice(0, 6)}…${hash.slice(-4)}`;
@@ -608,7 +608,7 @@ export default function Home() {
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
                         ETA
                       </p>
-                      <p className="text-lg font-semibold">Instant</p>
+                      <p className="text-lg font-semibold">~10 sec</p>
                     </div>
                   </div>
 
