@@ -57,13 +57,16 @@ const getReadableError = (error: unknown) => {
 const baseChainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? "0");
 const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID ?? "0");
 
+const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL ?? "https://base-sepolia.drpc.org";
+const megaRpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? "https://carrot.megaeth.com/rpc";
+
 const baseChain = defineChain({
   id: baseChainId,
   name: "Base Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [process.env.NEXT_PUBLIC_BASE_RPC_URL ?? ""] },
-    public: { http: [process.env.NEXT_PUBLIC_BASE_RPC_URL ?? ""] },
+    default: { http: [baseRpcUrl] },
+    public: { http: [baseRpcUrl] },
   },
 });
 
@@ -72,26 +75,22 @@ const megaChain = defineChain({
   name: "MegaETH Testnet",
   nativeCurrency: { name: "MEGA", symbol: "MEGA", decimals: 18 },
   rpcUrls: {
-    default: { http: [process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? ""] },
-    public: { http: [process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? ""] },
+    default: { http: [megaRpcUrl] },
+    public: { http: [megaRpcUrl] },
   },
 });
 
 const getBaseClient = () => {
-  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL;
-  if (!rpcUrl) throw new Error("Base RPC URL not configured");
   return createPublicClient({
     chain: baseChain,
-    transport: http(rpcUrl),
+    transport: http(baseRpcUrl),
   });
 };
 
 const getMegaClient = () => {
-  const rpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL;
-  if (!rpcUrl) throw new Error("Mega RPC URL not configured");
   return createPublicClient({
     chain: megaChain,
-    transport: http(rpcUrl),
+    transport: http(megaRpcUrl),
   });
 };
 
@@ -140,6 +139,7 @@ export default function Home() {
   const {
     data: ownedNfts = [],
     isPending,
+    error: nftError,
     refetch,
   } = useQuery<NftItem[]>({
     queryKey: ["nfts", address, fromChain],
@@ -156,6 +156,7 @@ export default function Home() {
         owner: address as Address,
       });
     },
+    retry: 2,
   });
 
   useEffect(() => {
@@ -347,6 +348,22 @@ export default function Home() {
       return (
         <div className="grid-surface text-center">
           <p>Fetching inventory on {CHAIN_CONFIG[fromChain].label}…</p>
+        </div>
+      );
+    }
+
+    if (nftError) {
+      return (
+        <div className="grid-surface text-center">
+          <p className="text-red-500">
+            Error loading NFTs: {getReadableError(nftError)}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Retry
+          </button>
         </div>
       );
     }
