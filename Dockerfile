@@ -13,14 +13,14 @@ COPY . .
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Railway injects environment variables at build time
-# According to Railway docs: https://docs.railway.com/guides/dockerfiles
-# Variables are available as regular ENV vars during build
-# Create .env.production file so Next.js can read them
+# Railway doesn't automatically pass env vars as build args
+# Try to read them from environment, but use fallbacks if not available
+# The fallback addresses in page.tsx will ensure it works either way
 RUN echo "=== Checking Railway Environment Variables ===" && \
     node scripts/create-env.js && \
     echo "=== .env.production created ===" && \
-    cat .env.production || echo "Warning: Could not create .env.production"
+    (cat .env.production 2>/dev/null || echo "No .env.production created - using fallback addresses") && \
+    echo "Note: If env vars are NOT SET, the app will use hardcoded fallback addresses"
 
 # Build the application
 RUN npm run build
