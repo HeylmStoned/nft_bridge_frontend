@@ -77,15 +77,23 @@ const megaChain = defineChain({
   },
 });
 
-const baseClient = createPublicClient({
-  chain: baseChain,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL ?? ""),
-});
+const getBaseClient = () => {
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL;
+  if (!rpcUrl) throw new Error("Base RPC URL not configured");
+  return createPublicClient({
+    chain: baseChain,
+    transport: http(rpcUrl),
+  });
+};
 
-const megaClient = createPublicClient({
-  chain: megaChain,
-  transport: http(process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? ""),
-});
+const getMegaClient = () => {
+  const rpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL;
+  if (!rpcUrl) throw new Error("Mega RPC URL not configured");
+  return createPublicClient({
+    chain: megaChain,
+    transport: http(rpcUrl),
+  });
+};
 
 const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
   base: {
@@ -107,6 +115,8 @@ const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     icon: "MΞ",
   },
 };
+
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -136,7 +146,7 @@ export default function Home() {
     enabled: Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress),
     queryFn: async () => {
       if (!address) return [];
-      const client = fromChain === "base" ? baseClient : megaClient;
+      const client = fromChain === "base" ? getBaseClient() : getMegaClient();
       const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
       if (!nftAddress) return [];
 
@@ -206,7 +216,7 @@ export default function Home() {
         }
       }
 
-      const client = fromChain === "base" ? baseClient : megaClient;
+      const client = fromChain === "base" ? getBaseClient() : getMegaClient();
 
       // Check if bridge is paused
       setBridgeStatus("Checking bridge status…");
