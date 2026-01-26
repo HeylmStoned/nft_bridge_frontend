@@ -495,6 +495,17 @@ export default function Home() {
 
   return (
     <div className="app-shell">
+      {/* Sticky bunny in bottom right */}
+      <div className="fixed bottom-0 right-0 z-50 pointer-events-none">
+        <Image
+          src="/bunn1.png"
+          alt=""
+          width={600}
+          height={600}
+          className="opacity-90 hover:opacity-100 transition-opacity"
+        />
+      </div>
+      
       <header className="relative border-b border-black/5 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -505,7 +516,26 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10 fade-in">
+      <main className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10 fade-in relative">
+        {/* Decorative bunny images */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-5">
+          <Image
+            src="/bunn1.png"
+            alt=""
+            width={200}
+            height={200}
+            className="absolute -left-20 top-20 rotate-12"
+            style={{ filter: 'grayscale(100%)' }}
+          />
+          <Image
+            src="/bunn2.png"
+            alt=""
+            width={200}
+            height={200}
+            className="absolute -right-20 bottom-20 -rotate-12"
+            style={{ filter: 'grayscale(100%)' }}
+          />
+        </div>
         <section className="grid gap-10 lg:grid-cols-[0.9fr,1.1fr]" id="bridge">
           <div className="space-y-6">
             <div className="space-y-4">
@@ -575,7 +605,7 @@ export default function Home() {
                       To
                     </div>
                     <div className="mt-2 flex items-center gap-3">
-                      <span className="rounded-full bg-yellow-300 px-3 py-1 text-sm font-semibold text-black">
+                      <span className="rounded-full bg-slate-600 px-3 py-1 text-sm font-semibold text-white">
                         {CHAIN_CONFIG[toChain].icon}
                       </span>
                       <div>

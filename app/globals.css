@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: 45 25% 98%;
-  --foreground: 227 13% 13%;
-  --muted: 210 9% 75%;
-  --muted-strong: 230 7% 40%;
-  --accent-primary: 48 98% 52%;
-  --accent-secondary: 330 92% 46%;
-  --grid-line: 210 10% 86%;
+  --background: 220 15% 96%;
+  --foreground: 220 10% 15%;
+  --muted: 220 8% 70%;
+  --muted-strong: 220 6% 35%;
+  --accent-primary: 220 8% 45%;
+  --accent-secondary: 220 10% 55%;
+  --grid-line: 220 8% 88%;
   --card: 0 0% 100%;
-  --card-border: 228 15% 85%;
+  --card-border: 220 8% 80%;
   --radius-sm: 0.4rem;
   --radius-md: 0.9rem;
   --radius-lg: 1.5rem;
-  --shadow-soft: 0 25px 60px hsla(222, 25%, 10%, 0.08);
+  --shadow-soft: 0 25px 60px hsla(220, 15%, 10%, 0.08);
 }
 
 @theme inline {
@@ -57,22 +57,21 @@ body {
 .app-shell::after {
   content: "";
   position: absolute;
-  inset: -20% 0 auto;
-  height: 480px;
-  background:
-    radial-gradient(
-      circle at 20% 20%,
-      hsla(var(--accent-primary) / 0.35),
-      transparent 65%
-    ),
-    radial-gradient(
-      circle at 80% 0%,
-      hsla(var(--accent-secondary) / 0.35),
-      transparent 55%
-    );
-  filter: blur(60px);
-  opacity: 0.7;
+  inset: 0;
+  background-image: 
+    url('/bunnbg.png');
+  background-size: 
+    cover,
+    40% auto;
+  background-position: 
+    center bottom,
+    right center;
+  background-repeat: 
+    no-repeat,
+    no-repeat;
+  opacity: 0.15;
   z-index: -3;
+  filter: grayscale(100%) brightness(0.9);
 }
 
 .grid-surface {
@@ -149,14 +148,19 @@ body {
     hsl(var(--accent-secondary)),
     hsl(var(--accent-primary))
   );
-  color: #111;
+  color: #fff;
   border-color: transparent;
-  box-shadow: 0 15px 40px hsla(47, 90%, 60%, 0.35);
+  box-shadow: 0 15px 40px hsla(220, 10%, 30%, 0.25);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 20px 50px hsla(47, 90%, 60%, 0.4);
+  box-shadow: 0 20px 50px hsla(220, 10%, 30%, 0.3);
+  background: linear-gradient(
+    120deg,
+    hsl(var(--accent-secondary) / 0.9),
+    hsl(var(--accent-primary) / 0.9)
+  );
 }
 
 .btn-ghost {
@@ -219,13 +223,13 @@ body {
 
 .nft-card:hover {
   transform: translateY(-4px);
-  border-color: hsla(var(--accent-secondary) / 0.8);
-  box-shadow: 0 18px 40px hsla(210, 20%, 60%, 0.2);
+  border-color: hsla(var(--accent-primary) / 0.6);
+  box-shadow: 0 18px 40px hsla(220, 10%, 40%, 0.15);
 }
 
 .nft-card.selected {
-  border-color: hsl(var(--accent-secondary));
-  box-shadow: 0 25px 50px hsla(330, 75%, 55%, 0.25);
+  border-color: hsl(var(--accent-primary));
+  box-shadow: 0 25px 50px hsla(220, 10%, 40%, 0.2);
 }
 
 .nft-card img {
