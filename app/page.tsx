@@ -263,8 +263,8 @@ export default function Home() {
             ? "batchLockNFTForEthereum"
             : "lockNFTForEthereum";
 
-      const args = multiple
-        ? [selectedNFTs.map((tokenId) => BigInt(tokenId)), address as Address]
+      const args: readonly [bigint, Address] | readonly [bigint[], Address] = multiple
+        ? [selectedNFTs.map((tokenId) => BigInt(tokenId)) as bigint[], address as Address]
         : [BigInt(selectedNFTs[0]), address as Address];
 
       setBridgeStatus("Submitting bridge transaction…");
