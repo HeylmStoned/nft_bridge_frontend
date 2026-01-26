@@ -13,14 +13,37 @@ COPY . .
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Railway doesn't automatically pass env vars as build args
-# Try to read them from environment, but use fallbacks if not available
-# The fallback addresses in page.tsx will ensure it works either way
-RUN echo "=== Checking Railway Environment Variables ===" && \
-    node scripts/create-env.js && \
-    echo "=== .env.production created ===" && \
-    (cat .env.production 2>/dev/null || echo "No .env.production created - using fallback addresses") && \
-    echo "Note: If env vars are NOT SET, the app will use hardcoded fallback addresses"
+# Railway injects environment variables at build time
+# According to Railway docs: https://docs.railway.com/guides/dockerfiles
+# We must declare them as ARG to access them during build
+ARG NEXT_PUBLIC_BASE_RPC_URL
+ARG NEXT_PUBLIC_MEGA_RPC_URL
+ARG NEXT_PUBLIC_BASE_CHAIN_ID
+ARG NEXT_PUBLIC_MEGA_CHAIN_ID
+ARG NEXT_PUBLIC_BAD_BUNNZ_BASE
+ARG NEXT_PUBLIC_BAD_BUNNZ_MEGA
+ARG NEXT_PUBLIC_ETH_BRIDGE
+ARG NEXT_PUBLIC_MEGA_BRIDGE
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+
+# Set them as ENV so Next.js can access them during build
+ENV NEXT_PUBLIC_BASE_RPC_URL=$NEXT_PUBLIC_BASE_RPC_URL
+ENV NEXT_PUBLIC_MEGA_RPC_URL=$NEXT_PUBLIC_MEGA_RPC_URL
+ENV NEXT_PUBLIC_BASE_CHAIN_ID=$NEXT_PUBLIC_BASE_CHAIN_ID
+ENV NEXT_PUBLIC_MEGA_CHAIN_ID=$NEXT_PUBLIC_MEGA_CHAIN_ID
+ENV NEXT_PUBLIC_BAD_BUNNZ_BASE=$NEXT_PUBLIC_BAD_BUNNZ_BASE
+ENV NEXT_PUBLIC_BAD_BUNNZ_MEGA=$NEXT_PUBLIC_BAD_BUNNZ_MEGA
+ENV NEXT_PUBLIC_ETH_BRIDGE=$NEXT_PUBLIC_ETH_BRIDGE
+ENV NEXT_PUBLIC_MEGA_BRIDGE=$NEXT_PUBLIC_MEGA_BRIDGE
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+
+# Debug: Check what Railway passed
+RUN echo "=== Railway Build Args ===" && \
+    echo "NEXT_PUBLIC_BASE_RPC_URL: ${NEXT_PUBLIC_BASE_RPC_URL:-NOT SET}" && \
+    echo "NEXT_PUBLIC_BAD_BUNNZ_BASE: ${NEXT_PUBLIC_BAD_BUNNZ_BASE:-NOT SET}" && \
+    echo "NEXT_PUBLIC_ETH_BRIDGE: ${NEXT_PUBLIC_ETH_BRIDGE:-NOT SET}"
 
 # Build the application
 RUN npm run build
