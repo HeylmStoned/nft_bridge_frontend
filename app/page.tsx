@@ -136,6 +136,16 @@ export default function Home() {
     activeChainConfig.bridgeAddress && activeChainConfig.nftAddress,
   );
 
+  const queryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress);
+  console.log("[NFT Query] Enabled check:", {
+    queryEnabled,
+    hasAddress: Boolean(address),
+    hasNftAddress: Boolean(CHAIN_CONFIG[fromChain].nftAddress),
+    address,
+    fromChain,
+    nftAddress: CHAIN_CONFIG[fromChain].nftAddress,
+  });
+
   const {
     data: ownedNfts = [],
     isPending,
@@ -143,21 +153,43 @@ export default function Home() {
     refetch,
   } = useQuery<NftItem[]>({
     queryKey: ["nfts", address, fromChain],
-    enabled: Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress),
+    enabled: queryEnabled,
     queryFn: async () => {
-      if (!address) return [];
-      const client = fromChain === "base" ? getBaseClient() : getMegaClient();
-      const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
-      if (!nftAddress) return [];
+      console.log("[NFT Query] Starting fetch", { address, fromChain });
+      if (!address) {
+        console.log("[NFT Query] No address, returning empty");
+        return [];
+      }
+      try {
+        const client = fromChain === "base" ? getBaseClient() : getMegaClient();
+        const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
+        console.log("[NFT Query] Client created, nftAddress:", nftAddress);
+        if (!nftAddress) {
+          console.log("[NFT Query] No nftAddress, returning empty");
+          return [];
+        }
 
-      return fetchOwnedNfts({
-        client,
-        nftAddress,
-        owner: address as Address,
-      });
+        console.log("[NFT Query] Calling fetchOwnedNfts...");
+        const result = await fetchOwnedNfts({
+          client,
+          nftAddress,
+          owner: address as Address,
+        });
+        console.log("[NFT Query] Success, found", result.length, "NFTs");
+        return result;
+      } catch (error) {
+        console.error("[NFT Query] Error:", error);
+        throw error;
+      }
     },
     retry: 2,
   });
+
+  useEffect(() => {
+    if (nftError) {
+      console.error("[NFT Query] Query error:", nftError);
+    }
+  }, [nftError]);
 
   useEffect(() => {
     setSelectedNFTs((current) =>

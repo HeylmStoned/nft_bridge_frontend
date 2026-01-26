@@ -29,12 +29,15 @@ export async function fetchOwnedNfts({
   owner,
   nftAddress,
 }: FetchOwnedNftsParams): Promise<NftItem[]> {
-  const tokenIds = (await client.readContract({
-    abi: badBunnzAbi,
-    address: nftAddress,
-    functionName: "tokensOfOwner",
-    args: [owner],
-  })) as readonly bigint[];
+  console.log("[fetchOwnedNfts] Starting", { owner, nftAddress });
+  try {
+    const tokenIds = (await client.readContract({
+      abi: badBunnzAbi,
+      address: nftAddress,
+      functionName: "tokensOfOwner",
+      args: [owner],
+    })) as readonly bigint[];
+    console.log("[fetchOwnedNfts] Got tokenIds:", tokenIds.length);
 
   const enriched = await Promise.all(
     tokenIds.map(async (tokenId) => {
@@ -57,5 +60,11 @@ export async function fetchOwnedNfts({
     }),
   );
 
-  return enriched.sort((a, b) => a.tokenId - b.tokenId);
+    const result = enriched.sort((a, b) => a.tokenId - b.tokenId);
+    console.log("[fetchOwnedNfts] Returning", result.length, "NFTs");
+    return result;
+  } catch (error) {
+    console.error("[fetchOwnedNfts] Error:", error);
+    throw error;
+  }
 }
