@@ -1,14 +1,16 @@
 "use client";
 
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Header } from "../components/Header";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Check,
+  Loader2,
   Shield,
   Sparkles,
   Timer,
   Wallet,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -35,6 +37,9 @@ type ChainConfig = {
   subLabel: string;
   icon: string;
 };
+
+/** Max NFTs per bridge tx (gas-safe; contracts have no hard limit). */
+const MAX_BRIDGE_BATCH = 20;
 
 const statusHighlights = [
   { label: "Verification", value: "Automated", icon: Shield },
@@ -136,6 +141,7 @@ export default function Home() {
   const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [bridgeTxHash, setBridgeTxHash] = useState<`0x${string}` | null>(null);
+  const [bridgeInitiatedAt, setBridgeInitiatedAt] = useState<number | null>(null);
   const [isSubmittingBridge, setIsSubmittingBridge] = useState(false);
   const activeChainConfig = CHAIN_CONFIG[fromChain];
   const isOnRequiredChain =
@@ -200,30 +206,47 @@ export default function Home() {
     refetchDestination();
   }, [refetchOrigin, refetchDestination]);
 
+  // Memoize token IDs to prevent infinite loops
+  const originTokenIds = useMemo(() => 
+    new Set(originNfts.map((nft) => nft.tokenId)),
+    [originNfts]
+  );
 
   useEffect(() => {
-    setSelectedNFTs((current) =>
-      current.filter((tokenId) =>
-        originNfts.some((nft) => nft.tokenId === tokenId),
-      ),
-    );
-  }, [originNfts]);
+    setSelectedNFTs((current) => {
+      const filtered = current.filter((tokenId) => originTokenIds.has(tokenId));
+      // Only update if selection actually changed
+      if (filtered.length === current.length && 
+          filtered.every((id, idx) => current[idx] === id)) {
+        return current;
+      }
+      return filtered;
+    });
+  }, [originTokenIds]);
 
   const toggleNFT = useCallback((tokenId: number) => {
-    setSelectedNFTs((current) =>
-      current.includes(tokenId)
-        ? current.filter((id) => id !== tokenId)
-        : [...current, tokenId],
-    );
+    setSelectedNFTs((current) => {
+      if (current.includes(tokenId)) return current.filter((id) => id !== tokenId);
+      if (current.length >= MAX_BRIDGE_BATCH) return current;
+      return [...current, tokenId];
+    });
   }, []);
 
   const selectAll = useCallback(() => {
-    setSelectedNFTs((current) =>
-      current.length === originNfts.length
-        ? []
-        : originNfts.map((nft) => nft.tokenId),
-    );
+    setSelectedNFTs((current) => {
+      const allIds = originNfts.map((nft) => nft.tokenId);
+      const capped = allIds.slice(0, MAX_BRIDGE_BATCH);
+      if (current.length === capped.length) return [];
+      return capped;
+    });
   }, [originNfts]);
+
+  // Auto-hide "bridge initiated" banner after 90s
+  useEffect(() => {
+    if (bridgeInitiatedAt == null) return;
+    const t = setTimeout(() => setBridgeInitiatedAt(null), 90_000);
+    return () => clearTimeout(t);
+  }, [bridgeInitiatedAt]);
 
   const handleBridge = useCallback(async () => {
     if (!address) {
@@ -248,6 +271,7 @@ export default function Home() {
       setIsSubmittingBridge(true);
       setBridgeError(null);
       setBridgeTxHash(null);
+      setBridgeInitiatedAt(null);
       setBridgeStatus("Preparing transaction…");
 
       if (chainConfig.chainId && chainId !== chainConfig.chainId) {
@@ -261,14 +285,21 @@ export default function Home() {
 
       const client = fromChain === "base" ? getBaseClient() : getMegaClient();
 
-      // Check if bridge is paused
+      // Check if bridge is paused (wrap in try-catch in case function doesn't exist or reverts)
       setBridgeStatus("Checking bridge status…");
-      const isPaused = (await client.readContract({
-        abi: bridgeAbi,
-        address: bridgeAddress,
-        functionName: "paused",
-        args: [],
-      })) as boolean;
+      let isPaused = false;
+      try {
+        isPaused = (await client.readContract({
+          abi: bridgeAbi,
+          address: bridgeAddress,
+          functionName: "paused",
+          args: [],
+        })) as boolean;
+      } catch (error) {
+        // If paused() call fails, assume bridge is not paused and continue
+        // This handles cases where the function might not exist or reverts
+        console.warn("Could not check bridge pause status:", error);
+      }
 
       if (isPaused) {
         throw new Error("Bridge is currently paused. Please try again later.");
@@ -332,6 +363,7 @@ export default function Home() {
       setBridgeStatus("Waiting for confirmation…");
       await client.waitForTransactionReceipt({ hash: bridgeHash });
 
+      setBridgeInitiatedAt(Date.now());
       setBridgeStatus("Bridge complete ✅");
       setSelectedNFTs([]);
       await refetchBoth();
@@ -448,9 +480,9 @@ export default function Home() {
                   onClick={selectAll}
                   className="btn btn-ghost text-xs sm:text-sm uppercase tracking-[0.2em] px-3 sm:px-4 py-1.5 sm:py-2"
                 >
-                  {selectedNFTs.length === originNfts.length
+                  {selectedNFTs.length === Math.min(originNfts.length, MAX_BRIDGE_BATCH)
                     ? "Deselect all"
-                    : "Select all"}
+                    : `Select all (max ${MAX_BRIDGE_BATCH})`}
                 </button>
               )}
             </div>
@@ -537,15 +569,7 @@ export default function Home() {
         />
       </div>
       
-      <header className="relative border-b border-black/5 bg-white/70 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center sm:justify-start">
-            <span className="pill text-xs sm:text-sm">WORLD</span>
-            <span className="pill text-xs sm:text-sm">BUNNZIFICATION</span>
-          </div>
-          <ConnectButton />
-        </div>
-      </header>
+      <Header active="bridge" />
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 sm:gap-10 px-4 sm:px-6 py-6 sm:py-10 fade-in relative">
         {/* Decorative bunny images */}
@@ -665,6 +689,7 @@ export default function Home() {
                         aria-atomic="true"
                       >
                         {selectedNFTs.length}
+                        <span className="text-base font-normal text-slate-500"> / {MAX_BRIDGE_BATCH}</span>
                       </p>
                     </div>
                     <div className="text-right">
@@ -693,6 +718,38 @@ export default function Home() {
                     <p className="text-xs font-mono text-slate-500">
                       Tx hash: {shortenHash(bridgeTxHash)}
                     </p>
+                  )}
+                  {bridgeInitiatedAt != null && (
+                    <div
+                      className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-3 sm:p-4 text-sm"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-emerald-600 mt-0.5" aria-hidden />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-emerald-800">
+                            Bridge initiated
+                          </p>
+                          <p className="mt-1 text-emerald-700">
+                            Your NFT is being moved to {CHAIN_CONFIG[toChain].label}. This usually takes ~60 seconds. Check the <button type="button" onClick={() => setGalleryTab("destination")} className="underline font-medium hover:no-underline">Destination</button> tab for your NFT.
+                          </p>
+                          {bridgeTxHash && (
+                            <p className="mt-2 text-xs font-mono text-emerald-600">
+                              Lock tx: {shortenHash(bridgeTxHash)}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setBridgeInitiatedAt(null)}
+                          className="shrink-0 rounded p-1 text-emerald-600 hover:bg-emerald-200/50 hover:text-emerald-800 transition-colors"
+                          aria-label="Dismiss"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

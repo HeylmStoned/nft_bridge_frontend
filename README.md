@@ -42,8 +42,9 @@ Visit `http://localhost:3000` to see the app.
 Create a `.env.local` file in the root directory:
 
 ```bash
-# Backend API
+# Backend API (used by server-side stats proxy; not exposed to the browser)
 NEXT_PUBLIC_API_BASE_URL=https://your-backend-url
+API_KEY=your-backend-api-key
 
 # RPC Endpoints
 NEXT_PUBLIC_BASE_RPC_URL=https://base-sepolia.drpc.org
