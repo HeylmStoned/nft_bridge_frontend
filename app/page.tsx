@@ -55,17 +55,17 @@ const getReadableError = (error: unknown) => {
 };
 
 
-const baseChainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? "0x14a34");
-const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID ?? "0x18c7");
+const baseChainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID as string);
+const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID as string);
 
-const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL ?? "https://base-sepolia.drpc.org";
-const megaRpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? "https://carrot.megaeth.com/rpc";
+const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL as string;
+const megaRpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL as string;
 
 // Add fallback addresses from your Railway config
-const baseNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE as Address) ?? ("0xcCc5D02de05A490D949A19be3685F371CB0F8543" as Address);
-const megaNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA as Address) ?? ("0xefE87bdC8A9eEBA823d530c6328E2A2E318fb41b" as Address);
-const baseBridgeAddress = (process.env.NEXT_PUBLIC_ETH_BRIDGE as Address) ?? ("0x713E2060eF942C3681225abf5e176fc1E5AFE31F" as Address);
-const megaBridgeAddress = (process.env.NEXT_PUBLIC_MEGA_BRIDGE as Address) ?? ("0x849F736Dfe0385E7c0EC429Cf89e23c316b48f51" as Address);
+const baseNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE as Address);
+const megaNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA as Address);
+const baseBridgeAddress = (process.env.NEXT_PUBLIC_ETH_BRIDGE as Address);
+const megaBridgeAddress = (process.env.NEXT_PUBLIC_MEGA_BRIDGE as Address);
 
 const baseChain = defineChain({
   id: baseChainId,
@@ -132,6 +132,7 @@ export default function Home() {
   const [selectedNFTs, setSelectedNFTs] = useState<number[]>([]);
   const [fromChain, setFromChain] = useState<ChainKey>("base");
   const toChain = fromChain === "base" ? "mega" : "base";
+  const [galleryTab, setGalleryTab] = useState<"origin" | "destination">("origin");
   const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [bridgeTxHash, setBridgeTxHash] = useState<`0x${string}` | null>(null);
@@ -143,43 +144,70 @@ export default function Home() {
     activeChainConfig.bridgeAddress && activeChainConfig.nftAddress,
   );
 
-  const queryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress);
+  const originQueryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress);
+  const destinationQueryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[toChain].nftAddress);
 
   const {
-    data: ownedNfts = [],
-    isPending,
-    error: nftError,
-    refetch,
+    data: originNfts = [],
+    isPending: isOriginPending,
+    error: originNftError,
+    refetch: refetchOrigin,
   } = useQuery<NftItem[]>({
     queryKey: ["nfts", address, fromChain],
-    enabled: queryEnabled,
+    enabled: originQueryEnabled,
     queryFn: async () => {
       if (!address) return [];
-      try {
-        const client = fromChain === "base" ? getBaseClient() : getMegaClient();
-        const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
-        if (!nftAddress) return [];
-
-        return await fetchOwnedNfts({
-          client,
-          nftAddress,
-          owner: address as Address,
-        });
-      } catch (error) {
-        throw error;
-      }
+      const client = fromChain === "base" ? getBaseClient() : getMegaClient();
+      const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
+      if (!nftAddress) return [];
+      return await fetchOwnedNfts({
+        client,
+        nftAddress,
+        owner: address as Address,
+      });
     },
     retry: 2,
   });
+
+  const {
+    data: destinationNfts = [],
+    isPending: isDestinationPending,
+    error: destinationNftError,
+    refetch: refetchDestination,
+  } = useQuery<NftItem[]>({
+    queryKey: ["nfts", address, toChain],
+    enabled: destinationQueryEnabled,
+    queryFn: async () => {
+      if (!address) return [];
+      const client = toChain === "base" ? getBaseClient() : getMegaClient();
+      const nftAddress = CHAIN_CONFIG[toChain].nftAddress;
+      if (!nftAddress) return [];
+      return await fetchOwnedNfts({
+        client,
+        nftAddress,
+        owner: address as Address,
+      });
+    },
+    retry: 2,
+  });
+
+  const ownedNfts = galleryTab === "origin" ? originNfts : destinationNfts;
+  const isPending = galleryTab === "origin" ? isOriginPending : isDestinationPending;
+  const nftError = galleryTab === "origin" ? originNftError : destinationNftError;
+  const refetch = galleryTab === "origin" ? refetchOrigin : refetchDestination;
+  const refetchBoth = useCallback(() => {
+    refetchOrigin();
+    refetchDestination();
+  }, [refetchOrigin, refetchDestination]);
 
 
   useEffect(() => {
     setSelectedNFTs((current) =>
       current.filter((tokenId) =>
-        ownedNfts.some((nft) => nft.tokenId === tokenId),
+        originNfts.some((nft) => nft.tokenId === tokenId),
       ),
     );
-  }, [ownedNfts]);
+  }, [originNfts]);
 
   const toggleNFT = useCallback((tokenId: number) => {
     setSelectedNFTs((current) =>
@@ -191,11 +219,11 @@ export default function Home() {
 
   const selectAll = useCallback(() => {
     setSelectedNFTs((current) =>
-      current.length === ownedNfts.length
+      current.length === originNfts.length
         ? []
-        : ownedNfts.map((nft) => nft.tokenId),
+        : originNfts.map((nft) => nft.tokenId),
     );
-  }, [ownedNfts]);
+  }, [originNfts]);
 
   const handleBridge = useCallback(async () => {
     if (!address) {
@@ -306,7 +334,7 @@ export default function Home() {
 
       setBridgeStatus("Bridge complete ✅");
       setSelectedNFTs([]);
-      await refetch();
+      await refetchBoth();
       setTimeout(() => setBridgeStatus(null), 5000);
     } catch (error) {
       setBridgeError(getReadableError(error));
@@ -318,7 +346,7 @@ export default function Home() {
     address,
     chainId,
     fromChain,
-    refetch,
+    refetchBoth,
     selectedNFTs,
     switchChainAsync,
     writeContractAsync,
@@ -348,6 +376,9 @@ export default function Home() {
     isSubmittingBridge ||
     !bridgeConfigured;
 
+  const galleryChain = galleryTab === "origin" ? fromChain : toChain;
+  const galleryLabel = CHAIN_CONFIG[galleryChain].label;
+
   const gallery = useMemo(() => {
     if (!isConnected) {
       return (
@@ -358,113 +389,145 @@ export default function Home() {
       );
     }
 
-    if (isPending) {
-      return (
-        <div className="grid-surface text-center">
-          <p>Fetching inventory on {CHAIN_CONFIG[fromChain].label}…</p>
-        </div>
-      );
-    }
-
-    if (nftError) {
-      return (
-        <div className="grid-surface text-center">
-          <p className="text-red-500">
-            Error loading NFTs: {getReadableError(nftError)}
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
-
-    if (ownedNfts.length === 0) {
-      return (
-        <div className="grid-surface text-center">
-          <p>No Bad Bunnz on {CHAIN_CONFIG[fromChain].label}.</p>
-        </div>
-      );
-    }
-
     return (
-      <>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="pill">Inventory</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-              Your Bad Bunnz
-            </h2>
-          </div>
+      <div className="grid-surface">
+        {/* Tabs: Origin / Destination */}
+        <div className="flex gap-1 p-1 rounded-xl bg-black/5 border border-black/10 mb-4">
           <button
             type="button"
-            onClick={selectAll}
-            className="btn btn-ghost text-sm uppercase tracking-[0.2em]"
+            onClick={() => setGalleryTab("origin")}
+            className={`flex-1 rounded-lg py-2.5 px-3 text-sm font-semibold transition-colors ${
+              galleryTab === "origin"
+                ? "bg-white text-foreground shadow-sm border border-black/10"
+                : "text-slate-500 hover:text-foreground"
+            }`}
           >
-            {selectedNFTs.length === ownedNfts.length
-              ? "Deselect all"
-              : "Select all"}
+            Origin · {CHAIN_CONFIG[fromChain].label}
+          </button>
+          <button
+            type="button"
+            onClick={() => setGalleryTab("destination")}
+            className={`flex-1 rounded-lg py-2.5 px-3 text-sm font-semibold transition-colors ${
+              galleryTab === "destination"
+                ? "bg-white text-foreground shadow-sm border border-black/10"
+                : "text-slate-500 hover:text-foreground"
+            }`}
+          >
+            Destination · {CHAIN_CONFIG[toChain].label}
           </button>
         </div>
-        <div className="nft-grid">
-          {ownedNfts.map((nft) => {
-            const isSelected = selectedNFTs.includes(nft.tokenId);
-            return (
-              <button
-                key={nft.tokenId}
-                type="button"
-                aria-pressed={isSelected}
-                aria-label={`Toggle ${nft.name}`}
-                onClick={() => toggleNFT(nft.tokenId)}
-                className={`nft-card ${isSelected ? "selected" : ""}`}
-              >
-                <div className="relative aspect-square overflow-hidden">
-                  {nft.image ? (
-                    <Image
-                      src={nft.image}
-                      alt={nft.name}
-                      loading="lazy"
-                      className="object-cover"
-                      fill
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-slate-500">
-                      Preview unavailable
+
+        {isPending ? (
+          <p className="text-center py-6">Fetching inventory on {galleryLabel}…</p>
+        ) : nftError ? (
+          <div className="text-center py-6">
+            <p className="text-red-500">
+              Error loading NFTs: {getReadableError(nftError)}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Retry
+            </button>
+          </div>
+        ) : ownedNfts.length === 0 ? (
+          <p className="text-center py-6">No Bad Bunnz on {galleryLabel}.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="pill text-xs sm:text-sm">Inventory</p>
+                <h2 className="mt-2 text-xl sm:text-2xl font-semibold tracking-tight">
+                  Your Bad Bunnz on {galleryLabel}
+                </h2>
+              </div>
+              {galleryTab === "origin" && (
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="btn btn-ghost text-xs sm:text-sm uppercase tracking-[0.2em] px-3 sm:px-4 py-1.5 sm:py-2"
+                >
+                  {selectedNFTs.length === originNfts.length
+                    ? "Deselect all"
+                    : "Select all"}
+                </button>
+              )}
+            </div>
+            <div className="nft-grid">
+              {ownedNfts.map((nft) => {
+                const isOriginTab = galleryTab === "origin";
+                const isSelected = isOriginTab && selectedNFTs.includes(nft.tokenId);
+                const content = (
+                  <>
+                    <div className="relative aspect-square overflow-hidden">
+                      {nft.image ? (
+                        <Image
+                          src={nft.image}
+                          alt={nft.name}
+                          loading="lazy"
+                          className="object-cover"
+                          fill
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                          Preview unavailable
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <footer>
-                  <span>{nft.name}</span>
-                </footer>
-                {isSelected && (
-                  <span className="absolute right-3 top-3 rounded-full bg-black/80 p-1 text-white">
-                    <Check className="h-4 w-4" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </>
+                    <footer>
+                      <span>{nft.name}</span>
+                    </footer>
+                    {isSelected && (
+                      <span className="absolute right-3 top-3 rounded-full bg-black/80 p-1 text-white">
+                        <Check className="h-4 w-4" />
+                      </span>
+                    )}
+                  </>
+                );
+                return isOriginTab ? (
+                  <button
+                    key={nft.tokenId}
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={`Toggle ${nft.name}`}
+                    onClick={() => toggleNFT(nft.tokenId)}
+                    className={`nft-card ${isSelected ? "selected" : ""}`}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div key={nft.tokenId} className="nft-card cursor-default">
+                    {content}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     );
   }, [
     fromChain,
+    toChain,
+    galleryTab,
+    galleryLabel,
     isConnected,
     isPending,
+    nftError,
     ownedNfts,
+    originNfts,
     selectedNFTs,
     selectAll,
     toggleNFT,
+    refetch,
   ]);
 
   return (
     <div className="app-shell">
       {/* Sticky bunny in bottom right */}
-      <div className="fixed bottom-0 right-0 z-50 pointer-events-none">
+      <div className="fixed bottom-0 right-0 z-50 pointer-events-none hidden md:block">
         <Image
           src="/bunn1.png"
           alt=""
@@ -475,18 +538,18 @@ export default function Home() {
       </div>
       
       <header className="relative border-b border-black/5 bg-white/70 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="pill">WORLD</span>
-            <span className="pill">BUNNZIFICATION</span>
+        <div className="mx-auto flex max-w-6xl flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center sm:justify-start">
+            <span className="pill text-xs sm:text-sm">WORLD</span>
+            <span className="pill text-xs sm:text-sm">BUNNZIFICATION</span>
           </div>
           <ConnectButton />
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10 fade-in relative">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 sm:gap-10 px-4 sm:px-6 py-6 sm:py-10 fade-in relative">
         {/* Decorative bunny images */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-5">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-5 hidden md:block">
           <Image
             src="/bunn1.png"
             alt=""
@@ -504,39 +567,39 @@ export default function Home() {
             style={{ filter: 'grayscale(100%)' }}
           />
         </div>
-        <section className="grid gap-10 lg:grid-cols-[0.9fr,1.1fr]" id="bridge">
-          <div className="space-y-6">
-            <div className="space-y-4">
+        <section className="grid gap-6 sm:gap-10 lg:grid-cols-[0.9fr,1.1fr]" id="bridge">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-3 sm:space-y-4">
               <span className="badge">Bridge</span>
-              <h1 className="hero-title text-4xl leading-tight">
+              <h1 className="hero-title text-3xl sm:text-4xl leading-tight">
                 Bridge your Bad Bunnz instantly
               </h1>
-              <p className="hero-subtitle text-base">
+              <p className="hero-subtitle text-sm sm:text-base">
                 Transfer your NFTs between Base Sepolia and MegaETH testnets
                 securely with automated verification.
               </p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {statusHighlights.map(({ label, value, icon: Icon }) => (
                   <div
                     key={label}
-                    className="rounded-2xl border border-black/10 bg-white/90 p-4 shadow-sm"
+                    className="rounded-2xl border border-black/10 bg-white/90 p-3 sm:p-4 shadow-sm"
                   >
                     <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-slate-500">
-                      <Icon className="h-3.5 w-3.5" />
+                      <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       {label}
                     </div>
-                    <div className="mt-2 text-xl font-semibold">{value}</div>
+                    <div className="mt-2 text-lg sm:text-xl font-semibold">{value}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bridge-panel space-y-6">
-              <div className="flex items-center justify-between">
+            <div className="bridge-panel space-y-4 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                 <h3>Bridge setup</h3>
                 <button
                   type="button"
-                  className="pill btn-ghost"
+                  className="pill btn-ghost text-xs sm:text-sm"
                   onClick={() =>
                     setFromChain((prev) => (prev === "base" ? "mega" : "base"))
                   }
@@ -545,18 +608,18 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 rounded-2xl border border-black/10 bg-white/80 p-4">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                  <div className="flex-1 rounded-2xl border border-black/10 bg-white/80 p-3 sm:p-4">
                     <div className="text-xs uppercase tracking-[0.4em] text-slate-500">
                       From
                     </div>
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="rounded-full bg-black px-3 py-1 text-sm font-semibold text-white">
+                    <div className="mt-2 flex items-center gap-2 sm:gap-3">
+                      <span className="rounded-full bg-black px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white">
                         {CHAIN_CONFIG[fromChain].icon}
                       </span>
                       <div>
-                        <p className="font-semibold">
+                        <p className="font-semibold text-sm sm:text-base">
                           {CHAIN_CONFIG[fromChain].label}
                         </p>
                         <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
@@ -565,19 +628,19 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <span className="rounded-full border border-black/10 bg-white/80 p-3">
-                    <ArrowRight className="h-5 w-5 text-black" />
+                  <span className="rounded-full border border-black/10 bg-white/80 p-2 sm:p-3 self-center sm:self-auto">
+                    <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-black rotate-90 sm:rotate-0" />
                   </span>
-                  <div className="flex-1 rounded-2xl border border-black/10 bg-white/80 p-4">
+                  <div className="flex-1 rounded-2xl border border-black/10 bg-white/80 p-3 sm:p-4">
                     <div className="text-xs uppercase tracking-[0.4em] text-slate-500">
                       To
                     </div>
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="rounded-full bg-slate-600 px-3 py-1 text-sm font-semibold text-white">
+                    <div className="mt-2 flex items-center gap-2 sm:gap-3">
+                      <span className="rounded-full bg-slate-600 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white">
                         {CHAIN_CONFIG[toChain].icon}
                       </span>
                       <div>
-                        <p className="font-semibold">
+                        <p className="font-semibold text-sm sm:text-base">
                           {CHAIN_CONFIG[toChain].label}
                         </p>
                         <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
@@ -590,14 +653,14 @@ export default function Home() {
 
                 <div className="divider" />
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
                         Selected
                       </p>
                       <p
-                        className="text-3xl font-semibold"
+                        className="text-2xl sm:text-3xl font-semibold"
                         aria-live="polite"
                         aria-atomic="true"
                       >
@@ -608,7 +671,7 @@ export default function Home() {
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
                         ETA
                       </p>
-                      <p className="text-lg font-semibold">~60 sec</p>
+                      <p className="text-base sm:text-lg font-semibold">~60 sec</p>
                     </div>
                   </div>
 
@@ -636,7 +699,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="space-y-6">{gallery}</div>
+          <div className="space-y-4 sm:space-y-6">{gallery}</div>
         </section>
       </main>
     </div>
