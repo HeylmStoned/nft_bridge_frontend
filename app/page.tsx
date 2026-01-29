@@ -24,7 +24,7 @@ import {
 } from "wagmi";
 import { badBunnzAbi } from "../lib/abi/badBunnz";
 import { bridgeAbi } from "../lib/abi/bridge";
-import { fetchOwnedNfts, type NftItem } from "../lib/fetchNfts";
+import { fetchOwnedNfts, fetchOwnedNftsViaAlchemy, getAlchemyApiKeyFromRpc, type NftItem } from "../lib/fetchNfts";
 
 type ChainKey = "base" | "mega";
 
@@ -36,6 +36,7 @@ type ChainConfig = {
   label: string;
   subLabel: string;
   icon: string;
+  iconPath?: string;
 };
 
 /** Max NFTs per bridge tx (gas-safe; contracts have no hard limit). */
@@ -66,7 +67,6 @@ const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID as string);
 const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL as string;
 const megaRpcUrl = process.env.NEXT_PUBLIC_MEGA_RPC_URL as string;
 
-// Add fallback addresses from your Railway config
 const baseNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_BASE as Address);
 const megaNftAddress = (process.env.NEXT_PUBLIC_BAD_BUNNZ_MEGA as Address);
 const baseBridgeAddress = (process.env.NEXT_PUBLIC_ETH_BRIDGE as Address);
@@ -74,7 +74,7 @@ const megaBridgeAddress = (process.env.NEXT_PUBLIC_MEGA_BRIDGE as Address);
 
 const baseChain = defineChain({
   id: baseChainId,
-  name: "Base Sepolia",
+  name: "Ethereum",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
     default: { http: [baseRpcUrl] },
@@ -84,7 +84,7 @@ const baseChain = defineChain({
 
 const megaChain = defineChain({
   id: megaChainId,
-  name: "MegaETH Testnet",
+  name: "MegaETH",
   nativeCurrency: { name: "MEGA", symbol: "MEGA", decimals: 18 },
   rpcUrls: {
     default: { http: [megaRpcUrl] },
@@ -112,9 +112,10 @@ const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     rpcUrl: baseRpcUrl,
     nftAddress: baseNftAddress,
     bridgeAddress: baseBridgeAddress,
-    label: "Base Sepolia",
-    subLabel: "Base testnet",
+    label: "Ethereum",
+    subLabel: "ETH mainnet",
     icon: "Ξ",
+    iconPath: "/eth-logo.png",
   },
   mega: {
     chainId: megaChainId,
@@ -122,10 +123,19 @@ const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     nftAddress: megaNftAddress,
     bridgeAddress: megaBridgeAddress,
     label: "MegaETH",
-    subLabel: "Permissioned",
+    subLabel: "MegaETH",
     icon: "MΞ",
+    iconPath: "/mega-logo.png",
   },
 };
+
+/** When set, NFT fetch/display uses this address instead of connected wallet (testing only; bridging still uses real wallet). */
+const TEST_OWNER_OVERRIDE = (() => {
+  const v = process.env.NEXT_PUBLIC_TEST_OWNER_OVERRIDE;
+  if (!v || typeof v !== "string") return null;
+  if (/^0x[a-fA-F0-9]{40}$/.test(v)) return v as Address;
+  return null;
+})();
 
 export const dynamic = 'force-dynamic';
 
@@ -150,8 +160,13 @@ export default function Home() {
     activeChainConfig.bridgeAddress && activeChainConfig.nftAddress,
   );
 
-  const originQueryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[fromChain].nftAddress);
-  const destinationQueryEnabled = Boolean(address) && Boolean(CHAIN_CONFIG[toChain].nftAddress);
+  /** For NFT fetch/display only; bridging always uses connected wallet. */
+  const effectiveOwnerForFetch: Address | null = (TEST_OWNER_OVERRIDE ?? address) as Address | null;
+
+  const originQueryEnabled = Boolean(effectiveOwnerForFetch) && Boolean(CHAIN_CONFIG[fromChain].nftAddress);
+  const destinationQueryEnabled = Boolean(effectiveOwnerForFetch) && Boolean(CHAIN_CONFIG[toChain].nftAddress);
+
+  const alchemyApiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? getAlchemyApiKeyFromRpc(baseRpcUrl);
 
   const {
     data: originNfts = [],
@@ -159,17 +174,21 @@ export default function Home() {
     error: originNftError,
     refetch: refetchOrigin,
   } = useQuery<NftItem[]>({
-    queryKey: ["nfts", address, fromChain],
+    queryKey: ["nfts", effectiveOwnerForFetch, fromChain, alchemyApiKey ?? ""],
     enabled: originQueryEnabled,
     queryFn: async () => {
-      if (!address) return [];
-      const client = fromChain === "base" ? getBaseClient() : getMegaClient();
+      if (!effectiveOwnerForFetch) return [];
       const nftAddress = CHAIN_CONFIG[fromChain].nftAddress;
       if (!nftAddress) return [];
+      // Ethereum NFT (BB_on_ETH) has no tokensOfOwner; use Alchemy API when key is set
+      if (fromChain === "base" && alchemyApiKey) {
+        return await fetchOwnedNftsViaAlchemy(effectiveOwnerForFetch, nftAddress, alchemyApiKey);
+      }
+      const client = fromChain === "base" ? getBaseClient() : getMegaClient();
       return await fetchOwnedNfts({
         client,
         nftAddress,
-        owner: address as Address,
+        owner: effectiveOwnerForFetch,
       });
     },
     retry: 2,
@@ -181,17 +200,17 @@ export default function Home() {
     error: destinationNftError,
     refetch: refetchDestination,
   } = useQuery<NftItem[]>({
-    queryKey: ["nfts", address, toChain],
+    queryKey: ["nfts", effectiveOwnerForFetch, toChain],
     enabled: destinationQueryEnabled,
     queryFn: async () => {
-      if (!address) return [];
+      if (!effectiveOwnerForFetch) return [];
       const client = toChain === "base" ? getBaseClient() : getMegaClient();
       const nftAddress = CHAIN_CONFIG[toChain].nftAddress;
       if (!nftAddress) return [];
       return await fetchOwnedNfts({
         client,
         nftAddress,
-        owner: address as Address,
+        owner: effectiveOwnerForFetch,
       });
     },
     retry: 2,
@@ -212,17 +231,18 @@ export default function Home() {
     [originNfts]
   );
 
+  // When origin has a list (e.g. MegaETH), keep selection in sync; when origin has no list (Ethereum), keep manual selection
   useEffect(() => {
+    if (originNfts.length === 0) return;
     setSelectedNFTs((current) => {
       const filtered = current.filter((tokenId) => originTokenIds.has(tokenId));
-      // Only update if selection actually changed
       if (filtered.length === current.length && 
           filtered.every((id, idx) => current[idx] === id)) {
         return current;
       }
       return filtered;
     });
-  }, [originTokenIds]);
+  }, [originTokenIds, originNfts.length]);
 
   const toggleNFT = useCallback((tokenId: number) => {
     setSelectedNFTs((current) => {
@@ -285,7 +305,6 @@ export default function Home() {
 
       const client = fromChain === "base" ? getBaseClient() : getMegaClient();
 
-      // Check if bridge is paused (wrap in try-catch in case function doesn't exist or reverts)
       setBridgeStatus("Checking bridge status…");
       let isPaused = false;
       try {
@@ -296,8 +315,6 @@ export default function Home() {
           args: [],
         })) as boolean;
       } catch (error) {
-        // If paused() call fails, assume bridge is not paused and continue
-        // This handles cases where the function might not exist or reverts
         console.warn("Could not check bridge pause status:", error);
       }
 
@@ -412,7 +429,7 @@ export default function Home() {
   const galleryLabel = CHAIN_CONFIG[galleryChain].label;
 
   const gallery = useMemo(() => {
-    if (!isConnected) {
+    if (!effectiveOwnerForFetch) {
       return (
         <div className="grid-surface text-center">
           <Wallet className="mx-auto mb-4 h-10 w-10 text-slate-500" />
@@ -474,7 +491,7 @@ export default function Home() {
                   Your Bad Bunnz on {galleryLabel}
                 </h2>
               </div>
-              {galleryTab === "origin" && (
+              {galleryTab === "origin" && originNfts.length > 0 && (
                 <button
                   type="button"
                   onClick={selectAll}
@@ -545,7 +562,7 @@ export default function Home() {
     toChain,
     galleryTab,
     galleryLabel,
-    isConnected,
+    effectiveOwnerForFetch,
     isPending,
     nftError,
     ownedNfts,
@@ -570,6 +587,14 @@ export default function Home() {
       </div>
       
       <Header active="bridge" />
+
+      {TEST_OWNER_OVERRIDE && (
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            Test mode: showing NFTs for <code className="font-mono">{TEST_OWNER_OVERRIDE.slice(0, 6)}…{TEST_OWNER_OVERRIDE.slice(-4)}</code>. Bridging still uses your connected wallet.
+          </p>
+        </div>
+      )}
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 sm:gap-10 px-4 sm:px-6 py-6 sm:py-10 fade-in relative">
         {/* Decorative bunny images */}
@@ -599,7 +624,7 @@ export default function Home() {
                 Bridge your Bad Bunnz instantly
               </h1>
               <p className="hero-subtitle text-sm sm:text-base">
-                Transfer your NFTs between Base Sepolia and MegaETH testnets
+                Transfer your NFTs between Ethereum and MegaETH
                 securely with automated verification.
               </p>
               <div className="grid gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -639,9 +664,15 @@ export default function Home() {
                       From
                     </div>
                     <div className="mt-2 flex items-center gap-2 sm:gap-3">
-                      <span className="rounded-full bg-black px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white">
-                        {CHAIN_CONFIG[fromChain].icon}
-                      </span>
+                      {CHAIN_CONFIG[fromChain].iconPath ? (
+                        <span className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 overflow-hidden rounded-full bg-black">
+                          <Image src={CHAIN_CONFIG[fromChain].iconPath!} alt="" width={36} height={36} className="h-full w-full object-cover" />
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-black px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white">
+                          {CHAIN_CONFIG[fromChain].icon}
+                        </span>
+                      )}
                       <div>
                         <p className="font-semibold text-sm sm:text-base">
                           {CHAIN_CONFIG[fromChain].label}
@@ -660,9 +691,15 @@ export default function Home() {
                       To
                     </div>
                     <div className="mt-2 flex items-center gap-2 sm:gap-3">
-                      <span className="rounded-full bg-slate-600 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white">
-                        {CHAIN_CONFIG[toChain].icon}
-                      </span>
+                      {CHAIN_CONFIG[toChain].iconPath ? (
+                        <span className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 overflow-hidden rounded-full bg-slate-600">
+                          <Image src={CHAIN_CONFIG[toChain].iconPath!} alt="" width={36} height={36} className="h-full w-full object-cover" />
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-600 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white">
+                          {CHAIN_CONFIG[toChain].icon}
+                        </span>
+                      )}
                       <div>
                         <p className="font-semibold text-sm sm:text-base">
                           {CHAIN_CONFIG[toChain].label}
