@@ -5,16 +5,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { defineChain } from "viem";
 import { WagmiProvider } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
+import { mainnet } from "wagmi/chains";
 import "@rainbow-me/rainbowkit/styles.css";
 
 const megaChainId = Number(process.env.NEXT_PUBLIC_MEGA_CHAIN_ID ?? "0x18c7");
 const megaRpcUrl =
   process.env.NEXT_PUBLIC_MEGA_RPC_URL ?? "https://carrot.megaeth.com/rpc";
 
-const megaEthTestnet = defineChain({
+const megaEth = defineChain({
   id: megaChainId,
-  name: "MegaETH Testnet",
+  name: "MegaETH",
   nativeCurrency: { name: "MEGA", symbol: "MEGA", decimals: 18 },
   rpcUrls: {
     default: { http: [megaRpcUrl] },
@@ -29,7 +29,7 @@ const walletConnectId =
 const config = getDefaultConfig({
   appName: "Bad Bunnz Bridge",
   projectId: walletConnectId,
-  chains: [baseSepolia, megaEthTestnet],
+  chains: [mainnet, megaEth],
   ssr: true,
 });
 

@@ -1,6 +1,13 @@
 export const badBunnzAbi = [
   {
     type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "tokensOfOwner",
     stateMutability: "view",
     inputs: [{ name: "owner", type: "address" }],

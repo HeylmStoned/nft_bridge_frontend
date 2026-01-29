@@ -60,6 +60,10 @@ NEXT_PUBLIC_BAD_BUNNZ_MEGA=0x...
 NEXT_PUBLIC_ETH_BRIDGE=0x...
 NEXT_PUBLIC_MEGA_BRIDGE=0x...
 
+# Optional: Alchemy API key for Ethereum NFT listing (if your ETH RPC is not Alchemy, set this)
+# When NEXT_PUBLIC_BASE_RPC_URL is an Alchemy URL (e.g. .../v2/KEY), the key is used automatically.
+# NEXT_PUBLIC_ALCHEMY_API_KEY=your-alchemy-api-key
+
 # WalletConnect
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your-project-id
 ```
