@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -13,28 +14,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-  "http://localhost:3000";
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const proto =
+    headersList.get("x-forwarded-proto") ??
+    (host.includes("localhost") ? "http" : "https");
+  const baseUrl = `${proto}://${host}`;
 
-export const metadata: Metadata = {
-  title: "Bad Bunnz Bridge",
-  description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
-  metadataBase: new URL(baseUrl),
-  openGraph: {
+  return {
     title: "Bad Bunnz Bridge",
     description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
-    images: ["/og.png"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Bad Bunnz Bridge",
-    description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
-    images: ["/og.png"],
-  },
-};
+    metadataBase: new URL(baseUrl),
+    openGraph: {
+      title: "Bad Bunnz Bridge",
+      description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
+      images: ["/og.png"],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Bad Bunnz Bridge",
+      description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
+      images: ["/og.png"],
+    },
+  };
+}
 
 export default function RootLayout({
   children,
