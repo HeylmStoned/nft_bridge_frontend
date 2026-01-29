@@ -13,9 +13,27 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+  "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "NFT Bridge",
-  description: "Bridge your NFTs across chains",
+  title: "Bad Bunnz Bridge",
+  description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
+  metadataBase: new URL(baseUrl),
+  openGraph: {
+    title: "Bad Bunnz Bridge",
+    description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
+    images: ["/og.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bad Bunnz Bridge",
+    description: "Bridge your Bad Bunnz NFTs between Ethereum and MegaETH",
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
