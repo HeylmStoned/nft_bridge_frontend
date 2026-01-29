@@ -25,6 +25,7 @@ export async function GET(_request: NextRequest) {
 
   const headers: HeadersInit = {};
   if (API_KEY) headers["x-api-key"] = API_KEY;
+  headers["referer"] = _request.nextUrl.origin;
 
   console.log("[stats proxy] target:", url.origin + url.pathname);
 
