@@ -648,10 +648,9 @@ export default function Home() {
                 <h3>Bridge setup</h3>
                 <button
                   type="button"
-                  className="pill btn-ghost text-xs sm:text-sm"
-                  onClick={() =>
-                    setFromChain((prev) => (prev === "base" ? "mega" : "base"))
-                  }
+                  className="pill btn-ghost text-xs sm:text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled
+                  title="Will be available shortly"
                 >
                   Swap direction
                 </button>
