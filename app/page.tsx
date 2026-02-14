@@ -200,13 +200,17 @@ export default function Home() {
     error: destinationNftError,
     refetch: refetchDestination,
   } = useQuery<NftItem[]>({
-    queryKey: ["nfts", effectiveOwnerForFetch, toChain],
+    queryKey: ["nfts", effectiveOwnerForFetch, toChain, alchemyApiKey ?? ""],
     enabled: destinationQueryEnabled,
     queryFn: async () => {
       if (!effectiveOwnerForFetch) return [];
-      const client = toChain === "base" ? getBaseClient() : getMegaClient();
       const nftAddress = CHAIN_CONFIG[toChain].nftAddress;
       if (!nftAddress) return [];
+      // Ethereum NFT (BB_on_ETH) has no tokensOfOwner; use Alchemy API when key is set
+      if (toChain === "base" && alchemyApiKey) {
+        return await fetchOwnedNftsViaAlchemy(effectiveOwnerForFetch, nftAddress, alchemyApiKey);
+      }
+      const client = toChain === "base" ? getBaseClient() : getMegaClient();
       return await fetchOwnedNfts({
         client,
         nftAddress,
